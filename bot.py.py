@@ -11,6 +11,13 @@ from datetime import datetime
 from aiogram import F
 from aiogram.utils.markdown import hide_link
 from aiogram.types import FSInputFile, URLInputFile, BufferedInputFile
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+import random
+from contextlib import suppress
+from aiogram.exceptions import TelegramBadRequest
+from typing import Optional
+from aiogram.filters.callback_data import CallbackData
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.INFO)
 # Объект бота
@@ -118,7 +125,93 @@ async def cmd_start(message: types.Message):
         ]
     ]
     keyboard=types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-    await message.answer("Что говорит папич", reply_markup=keyboard)  
+    await message.answer("Что говорит папич", reply_markup=keyboard)
+@dp.message(F.text.lower() == "пампарам")
+async def with_puree(message: types.Message):
+    await message.reply("Привет всех смотрящих")
+
+@dp.message(F.text.lower() == "изи изи изи для папизи")
+async def without_puree(message: types.Message):
+    await message.reply("НАААААААААААА")
+@dp.message(Command("reply_builder"))
+async def reply_builder(message: types.Message):
+    builder = ReplyKeyboardBuilder()
+    for i in range(1, 17):
+        builder.add(types.KeyboardButton(text=str(i)))
+    builder.adjust(4)
+    await message.answer(
+        "Выберите число:",
+        reply_markup=builder.as_markup(resize_keyboard=True),
+    )
+    
+@dp.message(Command("special_buttons"))
+async def cmd_special_buttons(message: types.Message):
+    builder = ReplyKeyboardBuilder()
+    builder.row(types.KeyboardButton(text="Запросить геолокацию", request_location=True),types.KeyboardButton(text="Запросить контакт",request_contact=True))
+    builder.row(types.KeyboardButton(text="Создать викторину", request_poll=types.KeyboardButtonPollType(type="quiz")))
+    builder.row(types.KeyboardButton(text="Выбрать премиум пользователя", request_user=types.KeyboardButtonRequestUser(request_id=1,user_is_premium=1)),types.KeyboardButton(text="Выбрать супергруппу с форумами",request_chat=types.KeyboardButtonRequestChat(request_id=2,chat_is_channel=False,chat_is_forum=True)))
+    await message.answer("Выбрать действие:",reply_markup=builder.as_markup(resize_keyboard=True))
+@dp.message(F.user_shared)
+async def on_user_shared(message: types.Message):
+    print(f"Request {message.user_shared.request_id}"
+          f"User ID {message.user_shared.user_id}")
+@dp.message(F.char_shared)
+async def on_user_share(message: types.Message):
+    print(f"Request {message.chat_shared.request_id}"
+          f"Chat ID {message.chat_shared.chat_id}")
+@dp.message(Command("inline_url"))
+async def cmd_inline_url(message: types.Message,bot:Bot):
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="Github",url="https://github.com/dashboard"))
+    builder.row(types.InlineKeyboardButton(text="Оф.канал Telegram",url="tg://resolve?domain=telegram"))
+    # user_id=1234567890
+    # chat_info=await bot.get_chat(user_id)
+    # if not chat_info.has_private_forwards:
+    #     builder.row(types.InlineKeyboardButton(text="Какой-то пользователь",url=f"tg://user?id={user_id}"))
+    await message.answer("Выберите ссылку",reply_markup=builder.as_markup())
+@dp.message(Command("random"))
+async def cmd_random(message : types.Message):
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(
+        text="Нажми меня",
+        callback_data="random_value")
+    )
+    await message.answer("Нажмите на кнопку, чтобы бот отправил вам число от 1 до 100",reply_markup=builder.as_markup())
+@dp.callback_query(F.data == "random_value")
+async def send_random_value(callback: types.CallbackQuery):
+    await callback.message.answer((str(random.randint(1,100))))
+    await callback.answer()
+userdata={}
+def get_keyboard():
+    buttons=[
+        [
+            types.InlineKeyboardButton(text="-1",callback_data="num_decr"),
+            types.InlineKeyboardButton(text="+1",callback_data="num_incr")
+        ],
+            [types.InlineKeyboardButton(text="Подтвердить",callback_data="num_finish")]
+        ]
+    keyboard=types.InlineKeyboardMarkup(inline_keyboard=buttons)
+    return keyboard
+async def update_num_text(message: types.Message,new_value: int):
+    with suppress(TelegramBadRequest):
+        await message.edit_text(f"Укажите число:{new_value}",reply_markup=get_keyboard())
+@dp.message(Command("numbers"))
+async def cmd_numbers(message: types.Message):
+    userdata[message.from_user.id]=0
+    await message.answer("Укажите число: 0",reply_markup=get_keyboard())
+@dp.callback_query(F.data.startswith("num_"))
+async def callbacks_num(callback:types.CallbackQuery):
+    user_value=userdata.get(callback.from_user.id,0)
+    action=callback.data.split("_")[1]
+    if action == "incr":
+        userdata[callback.from_user.id]=user_value+1
+        await update_num_text(callback.message, user_value+1)
+    elif action == "decr":
+        userdata[callback.from_user.id]=user_value-1
+        await update_num_text(callback.message,user_value-1)
+    elif action=="finish":
+        await callback.message.edit_text(f"Итого: {user_value}")
+    await callback.answer()
 # Запуск процесса поллинга новых апдейтов
 async def main():
     await dp.start_polling(bot)
