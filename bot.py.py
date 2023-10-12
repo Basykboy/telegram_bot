@@ -21,14 +21,16 @@ from aiogram.filters.callback_data import CallbackData
 from magic_filter import F
 from aiogram.utils.callback_answer import CallbackAnswerMiddleware
 from aiogram.utils.callback_answer import CallbackAnswer
-from handlers import group_games,usernames,Rock_Paper_Scissors
+from handlers import group_games,usernames,Rock_Paper_Scissors,ordering_food,common
+from aiogram.fsm.storage.memory import MemoryStorage
+from handlers import mode,save_images,save_text,common2
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.INFO)
 # Объект бота
 bot = Bot(token=config.bot_token.get_secret_value(), parse_mode="HTML")
 # Диспетчер
-dp = Dispatcher()
-dp.include_routers(usernames.router,group_games.router,Rock_Paper_Scissors.router)
+dp = Dispatcher(storage=MemoryStorage())
+dp.include_routers(save_text.router,save_images.router,common2.router,mode.router)
 # @dp.message(Command("start"))
 # async def cmd_start(message: types.Message):
 #     await message.answer("Hello!")
